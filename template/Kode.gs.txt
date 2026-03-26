@@ -1,0 +1,190 @@
+// ==========================================
+// KONFIGURASI ID GOOGLE WORKSPACE
+// ==========================================
+const SPREADSHEET_ID = '1_KeIpbNpPDnhllk8EA0n5h3x_yc8W8ZVcUfv_VY5F44'; 
+const SHEET_NAME = 'Data';
+const FOLDER_PDF_ID = '14_ABuCFxK5BYyPPKWO_3Ne9ZbbtXj92B';
+const FOLDER_GAMBAR_ID = '1yUDzkW6lliTdKEDqWeiviTP-pLbX_o4J';
+
+// Konfigurasi ID Template Google Docs berdasarkan jenis surat
+const TEMPLATE_DOCS = {
+  'Surat Keterangan Domisili': '1YjMjdRmNIIKSKZJjovn5piH1HikadK5urT6VKlL2ACc',
+  'Surat Keterangan Usaha': '1YjMjdRmNIIKSKZJjovn5piH1HikadK5urT6VKlL2ACc',
+  'Pertanggung Jawaban Surat Keterangan Usaha': '1v2p9CCjmGawvQ9rlQgGXLUzTS0Utty-XYRACFpQN7TE'
+};
+
+// Ubah angka ini untuk mengatur kata sandi / PIN akses Admin
+const PIN_ADMIN = '123456'; 
+
+// ==========================================
+// FUNGSI ROUTING UTAMA
+// ==========================================
+function doGet(e) {
+  const html = HtmlService.createTemplateFromFile('index');
+  return html.evaluate()
+      .setTitle('Layanan Surat Desa Cibentang')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// ==========================================
+// FUNGSI OTORISASI ADMIN
+// ==========================================
+function verifikasiPinAdmin(pinInput) {
+  return pinInput === PIN_ADMIN;
+}
+
+// ==========================================
+// HELPER: FUNGSI TANGGAL INDONESIA
+// ==========================================
+function dapatkanTanggalIndo() {
+  const bulanIndo = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  const tgl = new Date();
+  const tanggal = tgl.getDate();
+  const bulan = bulanIndo[tgl.getMonth()];
+  const tahun = tgl.getFullYear();
+  return `${tanggal} ${bulan} ${tahun}`;
+}
+
+// ==========================================
+// FUNGSI UPLOAD GAMBAR PENGANTAR RT
+// ==========================================
+function uploadGambarRT(dataURI, namaPemohon) {
+  try {
+    const folderGambar = DriveApp.getFolderById(FOLDER_GAMBAR_ID);
+    
+    // Memisahkan metadata base64 dan mengambil isi datanya saja
+    const data = dataURI.split(',')[1];
+    const blob = Utilities.newBlob(Utilities.base64Decode(data), 'image/jpeg', 'Pengantar_RT_' + namaPemohon + '_' + new Date().getTime() + '.jpg');
+    
+    const fileGambar = folderGambar.createFile(blob);
+    return { status: 'success', url: fileGambar.getUrl() };
+  } catch (error) {
+    return { status: 'error', message: error.toString() };
+  }
+}
+
+// ==========================================
+// FUNGSI PEMROSESAN SURAT
+// ==========================================
+function prosesPermohonanSurat(dataForm) {
+  try {
+    const jenisSurat = dataForm.jenisSurat;
+    const templateId = TEMPLATE_DOCS[jenisSurat];
+    
+    if (!templateId) {
+      throw new Error("Template untuk jenis surat ini belum tersedia.");
+    }
+
+    // 1. Duplikasi template dokumen
+    const folderPdf = DriveApp.getFolderById(FOLDER_PDF_ID);
+    const templateDoc = DriveApp.getFileById(templateId);
+    const namaFileBaru = jenisSurat + " - " + dataForm.nama + " - " + dataForm.nik;
+    const copyDoc = templateDoc.makeCopy(namaFileBaru, folderPdf);
+    const copyDocId = copyDoc.getId();
+    
+    // 2. Modifikasi isi dokumen (replace text)
+    const doc = DocumentApp.openById(copyDocId);
+    const body = doc.getBody();
+    
+    body.replaceText('<<NAMA>>', dataForm.nama);
+    body.replaceText('<<NIK>>', dataForm.nik);
+    body.replaceText('<<TEMPAT_LAHIR>>', dataForm.tempatLahir || '-');
+    body.replaceText('<<TGL_LAHIR>>', dataForm.tanggalLahir || '-');
+    body.replaceText('<<JK>>', dataForm.jenisKelamin || '-');
+    body.replaceText('<<PEKERJAAN>>', dataForm.pekerjaan || '-');
+    body.replaceText('<<ALAMAT>>', dataForm.alamat || '-');
+    body.replaceText('<<TGL_SURAT>>', dapatkanTanggalIndo());
+    
+    doc.saveAndClose();
+    
+    // 3. Konversi ke PDF
+    const pdfBlob = copyDoc.getAs(MimeType.PDF);
+    const pdfFile = folderPdf.createFile(pdfBlob);
+    const pdfUrl = pdfFile.getUrl();
+    
+    // 4. Buat Link Download DOCX
+    const docxUrl = "https://docs.google.com/document/d/" + copyDocId + "/export?format=docx";
+    
+    // 5. Simpan log ke Google Sheets (Menambahkan URL Gambar RT di Kolom 7)
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    const timestamp = new Date();
+    sheet.appendRow([timestamp, dataForm.nama, dataForm.nik, jenisSurat, pdfUrl, docxUrl, dataForm.urlGambarRT]);
+    
+    return {
+      status: 'success',
+      message: 'Surat berhasil dibuat!',
+      url: pdfUrl
+    };
+    
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error.toString()
+    };
+  }
+}
+
+// ==========================================
+// FUNGSI MENGAMBIL DATA UNTUK ADMIN
+// ==========================================
+function dapatkanDataAdmin() {
+  try {
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    const lastRow = sheet.getLastRow();
+    
+    if (lastRow <= 1) {
+      return []; 
+    }
+    
+    // Mengambil 7 kolom sekarang (termasuk link Gambar RT)
+    const data = sheet.getRange(2, 1, lastRow - 1, 7).getDisplayValues();
+    return data.reverse(); 
+  } catch (error) {
+    throw new Error("Gagal mengambil data dari Database: " + error.message);
+  }
+}
+
+// ==========================================
+// FUNGSI MENGHAPUS DATA DAN FILE
+// ==========================================
+function hapusDataSurat(urlPdf, urlDocx, urlGambarRT) {
+  try {
+    // 1. Hapus PDF
+    if (urlPdf) {
+      const pdfIdMatch = urlPdf.match(/[-\w]{25,}/);
+      if (pdfIdMatch) DriveApp.getFileById(pdfIdMatch[0]).setTrashed(true);
+    }
+
+    // 2. Hapus DOCX
+    if (urlDocx) {
+      const docxIdMatch = urlDocx.match(/[-\w]{25,}/);
+      if (docxIdMatch) DriveApp.getFileById(docxIdMatch[0]).setTrashed(true);
+    }
+    
+    // 3. Hapus Gambar RT
+    if (urlGambarRT) {
+      const gbrIdMatch = urlGambarRT.match(/[-\w]{25,}/);
+      if (gbrIdMatch) DriveApp.getFileById(gbrIdMatch[0]).setTrashed(true);
+    }
+
+    // 4. Hapus Baris di Sheet
+    const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SHEET_NAME);
+    const data = sheet.getDataRange().getValues();
+    
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (data[i][4] === urlPdf) { 
+        sheet.deleteRow(i + 1); 
+        break; 
+      }
+    }
+
+    return { status: 'success', message: 'Data dan file berhasil dihapus.' };
+  } catch (error) {
+    return { status: 'error', message: 'Kegagalan menghapus file: ' + error.message };
+  }
+}

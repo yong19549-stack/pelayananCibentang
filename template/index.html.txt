@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Layanan Surat Desa Cibentang</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; }
+    .nav-btn.active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+    
+    .form-section { transition: all 0.4s ease-in-out; overflow: hidden; }
+    .form-hidden { max-height: 0; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; border: none !important; }
+    .form-visible { max-height: 1000px; opacity: 1; }
+    
+    th.sortable:hover { background-color: #f1f5f9; cursor: pointer; }
+    .upload-area { border: 2px dashed #cbd5e1; transition: all 0.3s ease; }
+    .upload-area:hover { border-color: #3b82f6; background-color: #eff6ff; }
+  </style>
+</head>
+<body class="text-gray-800">
+
+  <nav class="bg-white shadow-sm mb-8 sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="flex justify-between h-16">
+        <div class="flex items-center space-x-2">
+          <i class="fa-solid fa-file-signature text-blue-600 text-2xl"></i>
+          <span class="font-bold text-xl tracking-tight text-gray-800">Desa Cibentang</span>
+        </div>
+        <div class="flex space-x-4 items-center">
+          <button onclick="resetAplikasi()" id="btn-pemohon" class="nav-btn active px-3 py-2 text-gray-500 hover:text-blue-600 transition duration-300">
+            <i class="fa-solid fa-pen-to-square mr-1"></i> Buat Surat
+          </button>
+          <button onclick="aksesAdmin()" id="btn-admin" class="nav-btn px-3 py-2 text-gray-500 hover:text-blue-600 transition duration-300">
+            <i class="fa-solid fa-lock mr-1" id="ikon-kunci"></i> Admin Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="max-w-5xl mx-auto px-4 pb-12">
+
+    <div id="view-pengantar" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 transition-all duration-300">
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 text-blue-600 mb-4">
+          <i class="fa-solid fa-camera text-2xl"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-800">Langkah 1: Pengantar RT</h2>
+        <p class="text-gray-500 text-sm mt-2 max-w-lg mx-auto">Silakan ambil foto Surat Pengantar dari RT Anda. Dokumen akan dikompres secara otomatis ke ukuran terbaik (500KB - 1MB) untuk menjaga detailnya tetap tajam.</p>
+      </div>
+
+      <div class="max-w-xl mx-auto">
+        <label for="input-kamera" class="upload-area flex flex-col items-center justify-center w-full h-64 rounded-2xl cursor-pointer bg-gray-50 relative overflow-hidden">
+          <div id="upload-placeholder" class="flex flex-col items-center justify-center pt-5 pb-6">
+            <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3"></i>
+            <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Klik untuk membuka Kamera</span></p>
+            <p class="text-xs text-gray-400">Pastikan tulisan pada surat terbaca jelas</p>
+          </div>
+          <img id="preview-gambar" class="hidden absolute inset-0 w-full h-full object-contain bg-gray-900 p-2" />
+          <input id="input-kamera" type="file" accept="image/*" capture="environment" class="hidden" onchange="prosesGambarKamera(event)" />
+        </label>
+
+        <div id="info-kompresi" class="hidden mt-4 text-center text-sm font-medium py-2 rounded-xl border">
+          <span id="status-ikon"></span> <span id="status-teks"></span> (<span id="ukuran-gambar"></span> KB)
+        </div>
+
+        <div class="mt-8 flex justify-center">
+          <button id="btn-lanjut-form" onclick="uploadDanLanjut()" disabled class="bg-gray-300 text-gray-500 font-semibold py-3 px-10 rounded-xl shadow-sm transition-all duration-300 flex items-center cursor-not-allowed">
+            Lanjut Isi Data <i class="fa-solid fa-arrow-right ml-2"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="view-pemohon" class="hidden bg-white p-8 rounded-2xl shadow-sm border border-gray-100 transition-all duration-300">
+      <div class="mb-8 border-b border-gray-100 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">Langkah 2: Data Pemohon</h2>
+          <p class="text-gray-500 text-sm mt-1">Lengkapi data di bawah ini untuk menghasilkan surat otomatis.</p>
+        </div>
+        <div class="text-green-600 bg-green-50 px-3 py-1.5 rounded-lg text-sm font-semibold border border-green-100 flex items-center">
+          <i class="fa-solid fa-check-circle mr-2"></i> Foto RT Tersimpan
+        </div>
+      </div>
+
+      <form id="formSurat" onsubmit="handleFormSubmit(event)">
+        <div class="mb-5">
+          <label class="block text-sm font-semibold text-gray-700 mb-2" for="jenisSurat">Jenis Surat</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <i class="fa-solid fa-envelope-open-text text-gray-400"></i>
+            </div>
+            <select id="jenisSurat" name="jenisSurat" required onchange="cekJenisSurat()" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50 text-gray-700 appearance-none cursor-pointer">
+              <option value="" disabled selected>-- Pilih Jenis Surat --</option>
+              <option value="Surat Keterangan Domisili">Surat Keterangan Domisili</option>
+              <option value="Surat Keterangan Usaha">Surat Keterangan Usaha</option>
+              <option value="Pertanggung Jawaban Surat Keterangan Usaha">Pertanggung Jawaban Surat Keterangan Usaha</option>
+            </select>
+            <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+              <i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-5">
+          <label class="block text-sm font-semibold text-gray-700 mb-2" for="nama">Nama Lengkap</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <i class="fa-solid fa-user text-gray-400"></i>
+            </div>
+            <input type="text" id="nama" name="nama" required placeholder="Masukkan nama lengkap sesuai KTP" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50">
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-700 mb-2" for="nik">Nomor Induk Kependudukan (NIK)</label>
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none">
+              <i class="fa-solid fa-id-card text-gray-400"></i>
+            </div>
+            <input type="number" id="nik" name="nik" required placeholder="16 Digit NIK" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50">
+          </div>
+        </div>
+
+        <div id="form-tambahan" class="form-section form-hidden border-t border-gray-100 pt-6 mt-2">
+          <h3 class="text-md font-bold text-blue-600 mb-4"><i class="fa-solid fa-circle-info mr-2"></i>Informasi Tambahan Pemohon</h3>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2" for="tempatLahir">Tempat Lahir</label>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><i class="fa-solid fa-location-dot text-gray-400"></i></div>
+                <input type="text" id="tempatLahir" name="tempatLahir" placeholder="Kota/Kabupaten" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50">
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2" for="tanggalLahir">Tanggal Lahir</label>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><i class="fa-regular fa-calendar text-gray-400"></i></div>
+                <input type="date" id="tanggalLahir" name="tanggalLahir" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50 text-gray-700">
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-5">
+            <label class="block text-sm font-semibold text-gray-700 mb-3">Jenis Kelamin</label>
+            <div class="flex space-x-6 bg-gray-50 border border-gray-200 p-3 rounded-xl">
+              <label class="flex items-center cursor-pointer"><input type="radio" name="jenisKelamin" value="Laki-laki" class="w-5 h-5 text-blue-600 bg-white border-gray-300 focus:ring-blue-500"><span class="ml-2 text-gray-700">Laki-laki</span></label>
+              <label class="flex items-center cursor-pointer"><input type="radio" name="jenisKelamin" value="Perempuan" class="w-5 h-5 text-blue-600 bg-white border-gray-300 focus:ring-blue-500"><span class="ml-2 text-gray-700">Perempuan</span></label>
+            </div>
+          </div>
+
+          <div class="mb-5">
+            <label class="block text-sm font-semibold text-gray-700 mb-2" for="pekerjaan">Pekerjaan</label>
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"><i class="fa-solid fa-briefcase text-gray-400"></i></div>
+              <input type="text" id="pekerjaan" name="pekerjaan" placeholder="Sesuai KTP" class="block w-full pl-11 pr-3 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50">
+            </div>
+          </div>
+
+          <div class="mb-8 bg-gray-50 p-5 rounded-2xl border border-gray-200">
+            <label class="block text-sm font-bold text-gray-700 mb-4"><i class="fa-solid fa-map-location-dot text-blue-500 mr-2"></i>Alamat Lengkap Pemohon</label>
+            
+            <div class="mb-4">
+              <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2" for="dusun">Pilih Dusun</label>
+              <div class="relative">
+                <select id="dusun" name="dusun" onchange="updateDropdownRTRW()" class="block w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-white text-gray-700 appearance-none cursor-pointer shadow-sm">
+                  <option value="" disabled selected>-- Pilih Dusun --</option>
+                  <option value="Gunungguruh">Dusun Gunungguruh</option>
+                  <option value="Bojongduren">Dusun Bojongduren</option>
+                  <option value="Limusnunggal">Dusun Limusnunggal</option>
+                </select>
+                <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none"><i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i></div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2" for="rt">Pilih RT</label>
+                <div class="relative">
+                  <select id="rt" name="rt" class="block w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-white text-gray-700 appearance-none cursor-pointer shadow-sm">
+                    <option value="" disabled selected>-- Pilih RT --</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none"><i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i></div>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2" for="rw">Pilih RW</label>
+                <div class="relative">
+                  <select id="rw" name="rw" class="block w-full pl-4 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-white text-gray-700 appearance-none cursor-pointer shadow-sm">
+                    <option value="" disabled selected>-- Pilih RW --</option>
+                  </select>
+                  <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none"><i class="fa-solid fa-chevron-down text-gray-400 text-sm"></i></div>
+                </div>
+              </div>
+            </div>
+            
+            <p class="text-xs text-gray-400 mt-4 italic"><i class="fa-solid fa-circle-info mr-1"></i> (Desa Cibentang, Kec. Gunungguruh, Kab. Sukabumi) akan ditambahkan otomatis.</p>
+          </div>
+        </div>
+
+        <div class="flex justify-end mt-4 space-x-3">
+          <button type="button" onclick="switchView('pengantar')" class="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-semibold py-3 px-6 rounded-xl transition-all duration-300">
+            <i class="fa-solid fa-arrow-left mr-2"></i> Kembali
+          </button>
+          <button type="submit" id="btn-submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-xl shadow-sm hover:shadow-md transition-all duration-300 flex items-center">
+            <i class="fa-solid fa-paper-plane mr-2"></i> Kirim Permohonan
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div id="view-sukses" class="hidden bg-white p-8 md:p-12 rounded-2xl shadow-sm border border-gray-100 transition-all duration-300 text-center max-w-2xl mx-auto my-10">
+      <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-green-100 text-green-500 mb-6">
+        <i class="fa-solid fa-check text-5xl"></i>
+      </div>
+      <h2 class="text-3xl font-bold text-gray-800 mb-2">Permohonan Berhasil Terkirim!</h2>
+      <p class="text-gray-500 mb-8 leading-relaxed">Terima kasih. Permohonan Anda telah masuk ke dalam sistem kami dan sedang menunggu proses pencetakan oleh Admin Desa.</p>
+      
+      <div class="bg-gray-50 p-6 rounded-xl border border-gray-200 text-left mb-8">
+        <h3 class="font-bold text-gray-700 mb-4 border-b pb-2">Rincian Permohonan:</h3>
+        <ul class="space-y-3 text-sm text-gray-600">
+          <li class="flex justify-between"><span class="font-semibold text-gray-500">Nama Pemohon:</span> <span id="sukses-nama" class="font-medium text-gray-800"></span></li>
+          <li class="flex justify-between"><span class="font-semibold text-gray-500">NIK:</span> <span id="sukses-nik" class="font-medium text-gray-800"></span></li>
+          <li class="flex justify-between"><span class="font-semibold text-gray-500">Jenis Surat:</span> <span id="sukses-jenis" class="inline-block bg-blue-100 text-blue-700 py-1 px-2 rounded-lg text-xs font-bold tracking-wide"></span></li>
+          <li class="flex justify-between border-t pt-3 mt-3"><span class="font-semibold text-gray-500">Status Foto RT:</span> <span class="text-green-600 font-bold"><i class="fa-solid fa-circle-check mr-1"></i> Tersimpan</span></li>
+        </ul>
+      </div>
+
+      <button onclick="resetAplikasi()" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-xl shadow-sm hover:shadow-md transition-all duration-300">
+        <i class="fa-solid fa-house mr-2"></i> Buat Surat Baru
+      </button>
+    </div>
+
+    <div id="view-admin" class="hidden bg-white p-8 rounded-2xl shadow-sm border border-gray-100 transition-all duration-300">
+      
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-gray-100 pb-4 gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800">Arsip Permohonan Surat</h2>
+          <p class="text-gray-500 text-sm mt-1">Daftar seluruh surat yang telah dicetak oleh sistem.</p>
+        </div>
+        
+        <div class="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3 w-full md:w-auto">
+          <div class="relative w-full sm:w-64">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+            </div>
+            <input type="text" id="input-pencarian" oninput="cariDataAdmin()" placeholder="Cari Nama, NIK, Jenis..." class="block w-full pl-10 pr-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-100 focus:border-blue-500 outline-none transition bg-gray-50 text-sm">
+          </div>
+
+          <button onclick="keluarAdmin()" class="bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium flex items-center shadow-sm justify-center">
+            <i class="fa-solid fa-right-from-bracket sm:mr-2"></i> <span class="hidden sm:inline">Kunci</span>
+          </button>
+
+          <button onclick="muatDataAdmin()" class="bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl transition-all duration-200 text-sm font-medium flex items-center shadow-sm justify-center">
+            <i class="fa-solid fa-rotate-right sm:mr-2 text-blue-500"></i> <span class="hidden sm:inline">Segarkan</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto rounded-xl border border-gray-100">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-gray-50/80 text-gray-600 text-xs font-bold uppercase tracking-wider border-b border-gray-100 select-none">
+              <th onclick="sortTabel(0)" class="py-4 px-5 sortable transition-colors">Waktu <i class="fa-solid fa-sort ml-1 text-gray-400" id="sort-icon-0"></i></th>
+              <th onclick="sortTabel(1)" class="py-4 px-5 sortable transition-colors">Nama Pemohon <i class="fa-solid fa-sort ml-1 text-gray-400" id="sort-icon-1"></i></th>
+              <th onclick="sortTabel(2)" class="py-4 px-5 sortable transition-colors">NIK <i class="fa-solid fa-sort ml-1 text-gray-400" id="sort-icon-2"></i></th>
+              <th onclick="sortTabel(3)" class="py-4 px-5 sortable transition-colors">Jenis Surat <i class="fa-solid fa-sort ml-1 text-gray-400" id="sort-icon-3"></i></th>
+              <th class="py-4 px-5 text-center">Tindakan</th>
+            </tr>
+          </thead>
+          <tbody id="tabel-body" class="text-sm text-gray-700 divide-y divide-gray-50">
+            </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // State Aplikasi
+    let statusAdminAkses = false;
+    let dataAdminUtama = []; 
+    let dataAdminTampil = []; 
+    let kolomSortAktif = -1;
+    let arahSortAsc = true;
+    
+    let base64GambarKamera = '';
+    let linkGambarRTServer = ''; 
+
+    // Referensi Alamat
+    const referensiAlamat = {
+      'Gunungguruh': { rt: ['01', '02', '03', '04', '05', '06', '07', '08', '09'], rw: ['01', '02', '03', '04'] },
+      'Bojongduren': { rt: ['10', '11', '12', '13', '14', '15', '16'], rw: ['05', '06', '07'] },
+      'Limusnunggal': { rt: ['17', '18', '19', '20', '21', '22'], rw: ['08', '09', '10'] }
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if(localStorage.getItem('sesiAdminDesaCibentang') === 'aktif') {
+        statusAdminAkses = true;
+        document.getElementById('ikon-kunci').classList.replace('fa-lock', 'fa-unlock');
+      }
+    });
+
+    // ===============================================
+    // LOGIKA KAMERA & KOMPRESI PINTAR (500KB - 1MB)
+    // ===============================================
+    function prosesGambarKamera(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const placeholder = document.getElementById('upload-placeholder');
+      const preview = document.getElementById('preview-gambar');
+      const btnLanjut = document.getElementById('btn-lanjut-form');
+      
+      const infoKompresi = document.getElementById('info-kompresi');
+      const ikonStatus = document.getElementById('status-ikon');
+      const teksStatus = document.getElementById('status-teks');
+      const spanUkuran = document.getElementById('ukuran-gambar');
+
+      // Tampilkan status memuat
+      placeholder.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin text-4xl text-blue-500 mb-3"></i><p class="text-sm font-semibold text-blue-600">Menganalisis & Mengompresi...</p>`;
+      infoKompresi.classList.add('hidden'); // Sembunyikan info lama jika ada
+
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = function(e) {
+        const img = new Image();
+        img.src = e.target.result;
+        img.onload = function() {
+          
+          // Logika Kompresi Pintar untuk mencapai 500KB - 1MB
+          let resultBase64 = '';
+          let finalKB = 0;
+          let iterations = 0;
+          const MAX_ITERATIONS = 5;
+          
+          // Parameter awal
+          let currentWidth = img.width;
+          let currentHeight = img.height;
+          let currentQuality = 0.90; // Mulai dari kualitas tinggi
+
+          // 1. Cek ukuran asli terlebih dahulu
+          resultBase64 = e.target.result; // Gunakan aslinya dulu
+          finalKB = Math.round((resultBase64.length * 3 / 4) / 1024);
+
+          // 2. Jika terlalu besar (> 1MB), lakukan kompresi iteratif ke bawah
+          if (finalKB > 1024) {
+            console.log("Gambar terlalu besar, mulai kompresi ke bawah...");
+            
+            // Tentukan batas resolusi maksimal (misal 3000px agar tidak terlalu masif)
+            const MAX_RES = 3000;
+            if (currentWidth > MAX_RES || currentHeight > MAX_RES) {
+                if (currentWidth > currentHeight) { currentHeight *= MAX_RES / currentWidth; currentWidth = MAX_RES; } 
+                else { currentWidth *= MAX_RES / currentHeight; currentHeight = MAX_RES; }
+            }
+
+            for (iterations = 0; iterations < MAX_ITERATIONS; iterations++) {
+              const canvas = document.createElement('canvas');
+              canvas.width = currentWidth;
+              canvas.height = currentHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
+              
+              resultBase64 = canvas.toDataURL('image/jpeg', currentQuality);
+              finalKB = Math.round((resultBase64.length * 3 / 4) / 1024);
+
+              console.log(`Iterasi ${iterations+1} (Down): Res=${currentWidth}x${currentHeight}, Qual=${currentQuality}, Size=${finalKB}KB`);
+
+              if (finalKB <= 1000) break; // Berhenti jika sudah di bawah 1MB
+
+              // Turunkan parameter untuk iterasi berikutnya
+              currentQuality -= 0.1; // Turunkan kualitas 10%
+              currentWidth *= 0.9;  // Turunkan resolusi 10%
+              currentHeight *= 0.9;
+              
+              if (currentQuality < 0.5) currentQuality = 0.5; // Batas minimal kualitas
+            }
+          }
+          
+          // 3. Jika terlalu kecil (< 500KB) setelah Down-sampling atau memang aslinya kecil, 
+          // Coba Up-sampling resolusi atau Qual untuk detail lebih baik (hanya jika Down-sampling tidak dilakukan)
+          if (finalKB < 500 && iterations === 0) {
+              console.log("Gambar terlalu kecil, menggunakan kualitas asli maksimal.");
+              // Jika aslinya kecil, kita tidak bisa membuatnya lebih besar tanpa buram,
+              // jadi kita gunakan kualitas tertinggi yang mungkin dari canvas.
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width; // Gunakan res asli
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, img.width, img.height);
+              
+              resultBase64 = canvas.toDataURL('image/jpeg', 1.0); // Kualitas maksimal 100%
+              finalKB = Math.round((resultBase64.length * 3 / 4) / 1024);
+              console.log(`Final (Max Quality): Size=${finalKB}KB`);
+          }
+
+          // 4. Update Global Variable
+          base64GambarKamera = resultBase64;
+          
+          // 5. Update UI
+          preview.src = base64GambarKamera;
+          preview.classList.remove('hidden');
+          placeholder.classList.add('hidden');
+          spanUkuran.innerText = finalKB;
+
+          // Mengatur Warna & Ikon Status Ukuran
+          infoKompresi.classList.remove('hidden');
+          if (finalKB >= 500 && finalKB <= 1024) {
+            // Sempurna (Hijau)
+            infoKompresi.className = "mt-4 text-center text-sm font-medium py-2 rounded-xl border border-green-100 bg-green-50 text-green-600";
+            ikonStatus.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>';
+            teksStatus.innerText = "Ukuran Terbaik Berhasil Dicapai";
+          } else if (finalKB > 1024) {
+             // Masih terlalu besar (Kuning)
+            infoKompresi.className = "mt-4 text-center text-sm font-medium py-2 rounded-xl border border-yellow-100 bg-yellow-50 text-yellow-700";
+            ikonStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>';
+            teksStatus.innerText = "Selesai (Sedikit di atas 1MB)";
+          } else {
+             // Terlalu kecil (Kuning)
+            infoKompresi.className = "mt-4 text-center text-sm font-medium py-2 rounded-xl border border-yellow-100 bg-yellow-50 text-yellow-700";
+            ikonStatus.innerHTML = '<i class="fa-solid fa-image mr-1"></i>';
+            teksStatus.innerText = "Selesai (Menggunakan Kualitas Maksimal)";
+          }
+
+          // Aktifkan tombol
+          btnLanjut.disabled = false;
+          btnLanjut.classList.replace('bg-gray-300', 'bg-blue-600');
+          btnLanjut.classList.replace('text-gray-500', 'text-white');
+          btnLanjut.classList.replace('cursor-not-allowed', 'hover:bg-blue-700');
+        }
+      }
+    }
+
+    function uploadDanLanjut() {
+      if(!base64GambarKamera) return;
+
+      Swal.fire({
+        title: 'Siapkan Nama Anda',
+        text: 'Masukkan nama Anda untuk penamaan file foto di server:',
+        input: 'text',
+        inputPlaceholder: 'Nama Pemohon',
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb',
+        confirmButtonText: 'Upload & Lanjut',
+        customClass: { popup: 'rounded-2xl' },
+        preConfirm: (nama) => {
+          if(!nama) { Swal.showValidationMessage('Nama harus diisi!'); return false; }
+          return nama;
+        }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          
+          Swal.fire({
+            title: 'Mengunggah Foto...',
+            text: 'Harap tunggu, foto sedang disimpan ke server.',
+            allowOutsideClick: false,
+            didOpen: () => { Swal.showLoading(); },
+            customClass: { popup: 'rounded-2xl' }
+          });
+
+          document.getElementById('nama').value = result.value.toUpperCase();
+
+          google.script.run
+            .withSuccessHandler(function(response) {
+              if (response.status === 'success') {
+                linkGambarRTServer = response.url; 
+                Swal.close();
+                switchView('pemohon'); 
+              } else {
+                Swal.fire({ title: 'Gagal!', text: response.message, icon: 'error', customClass: { popup: 'rounded-2xl' } });
+              }
+            })
+            .withFailureHandler(function(err) {
+              Swal.fire({ title: 'Koneksi Terputus!', text: 'Gagal mengunggah foto.', icon: 'error', customClass: { popup: 'rounded-2xl' } });
+            })
+            .uploadGambarRT(base64GambarKamera, result.value);
+        }
+      });
+    }
+
+    // =====================================
+    // LOGIKA FORM & ADMIN
+    // =====================================
+    function updateDropdownRTRW() {
+      const dusun = document.getElementById('dusun').value;
+      const selectRt = document.getElementById('rt');
+      const selectRw = document.getElementById('rw');
+
+      selectRt.innerHTML = '<option value="" disabled selected>-- Pilih RT --</option>';
+      selectRw.innerHTML = '<option value="" disabled selected>-- Pilih RW --</option>';
+
+      if (dusun && referensiAlamat[dusun]) {
+        referensiAlamat[dusun].rt.forEach(rt => selectRt.innerHTML += `<option value="${rt}">${rt}</option>`);
+        referensiAlamat[dusun].rw.forEach(rw => selectRw.innerHTML += `<option value="${rw}">${rw}</option>`);
+      }
+    }
+
+    function cekJenisSurat() {
+      const jenisSurat = document.getElementById('jenisSurat').value;
+      const formTambahan = document.getElementById('form-tambahan');
+      
+      if (jenisSurat === 'Pertanggung Jawaban Surat Keterangan Usaha') {
+        formTambahan.classList.remove('form-hidden');
+        formTambahan.classList.add('form-visible');
+        document.getElementById('tempatLahir').required = true;
+        document.getElementById('tanggalLahir').required = true;
+        document.getElementById('pekerjaan').required = true;
+        document.getElementById('dusun').required = true;
+        document.getElementById('rt').required = true;
+        document.getElementById('rw').required = true;
+      } else {
+        formTambahan.classList.remove('form-visible');
+        formTambahan.classList.add('form-hidden');
+        document.getElementById('tempatLahir').required = false;
+        document.getElementById('tanggalLahir').required = false;
+        document.getElementById('pekerjaan').required = false;
+        document.getElementById('dusun').required = false;
+        document.getElementById('rt').required = false;
+        document.getElementById('rw').required = false;
+      }
+    }
+
+    function switchView(view) {
+      const pengantarView = document.getElementById('view-pengantar');
+      const pemohonView = document.getElementById('view-pemohon');
+      const suksesView = document.getElementById('view-sukses');
+      const adminView = document.getElementById('view-admin');
+      
+      const btnPemohon = document.getElementById('btn-pemohon');
+      const btnAdmin = document.getElementById('btn-admin');
+
+      pengantarView.classList.add('hidden');
+      pemohonView.classList.add('hidden');
+      suksesView.classList.add('hidden');
+      adminView.classList.add('hidden');
+
+      if (view === 'pengantar') {
+        pengantarView.classList.remove('hidden');
+        btnPemohon.classList.add('active');
+        btnAdmin.classList.remove('active');
+      } 
+      else if (view === 'pemohon') {
+        pemohonView.classList.remove('hidden');
+        btnPemohon.classList.add('active');
+        btnAdmin.classList.remove('active');
+      }
+      else if (view === 'sukses') {
+        suksesView.classList.remove('hidden');
+        btnPemohon.classList.add('active');
+        btnAdmin.classList.remove('active');
+      }
+      else if (view === 'admin') {
+        adminView.classList.remove('hidden');
+        btnPemohon.classList.remove('active');
+        btnAdmin.classList.add('active');
+        muatDataAdmin(); 
+      }
+    }
+
+    function resetAplikasi() {
+      document.getElementById('formSurat').reset();
+      updateDropdownRTRW();
+      cekJenisSurat(); 
+      
+      linkGambarRTServer = '';
+      base64GambarKamera = '';
+      document.getElementById('input-kamera').value = '';
+      document.getElementById('preview-gambar').classList.add('hidden');
+      
+      const placeholder = document.getElementById('upload-placeholder');
+      placeholder.innerHTML = `
+        <i class="fa-solid fa-cloud-arrow-up text-4xl text-gray-400 mb-3"></i>
+        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Klik untuk membuka Kamera</span></p>
+        <p class="text-xs text-gray-400">Pastikan tulisan pada surat terbaca jelas</p>
+      `;
+      placeholder.classList.remove('hidden');
+      
+      document.getElementById('info-kompresi').classList.add('hidden');
+      
+      const btnLanjut = document.getElementById('btn-lanjut-form');
+      btnLanjut.disabled = true;
+      btnLanjut.className = "bg-gray-300 text-gray-500 font-semibold py-3 px-10 rounded-xl shadow-sm transition-all duration-300 flex items-center cursor-not-allowed";
+      
+      switchView('pengantar');
+    }
+
+    function aksesAdmin() {
+      if (statusAdminAkses) { switchView('admin'); return; }
+
+      Swal.fire({
+        title: 'Otorisasi Keamanan',
+        text: 'Masukkan PIN rahasia untuk mengakses Arsip.',
+        input: 'password',
+        inputPlaceholder: 'Masukkan 6 Digit PIN',
+        inputAttributes: { autocapitalize: 'off', autocorrect: 'off' },
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb',
+        cancelButtonColor: '#9ca3af',
+        confirmButtonText: '<i class="fa-solid fa-unlock-keyhole mr-1"></i> Buka Akses',
+        cancelButtonText: 'Batal',
+        customClass: { popup: 'rounded-2xl' },
+        showLoaderOnConfirm: true,
+        preConfirm: (inputPin) => {
+          if (!inputPin) { Swal.showValidationMessage('PIN tidak boleh kosong!'); return false; }
+          return new Promise((resolve) => {
+            google.script.run
+              .withSuccessHandler(isValid => {
+                if (isValid) resolve(true); else { Swal.showValidationMessage('PIN Salah!'); resolve(false); }
+              })
+              .withFailureHandler(() => { Swal.showValidationMessage('Gagal koneksi'); resolve(false); })
+              .verifikasiPinAdmin(inputPin);
+          });
+        },
+        allowOutsideClick: () => !Swal.isLoading()
+      }).then((result) => {
+        if (result.isConfirmed && result.value) {
+          localStorage.setItem('sesiAdminDesaCibentang', 'aktif');
+          statusAdminAkses = true;
+          document.getElementById('ikon-kunci').classList.replace('fa-lock', 'fa-unlock');
+          Swal.fire({ title: 'Akses Diberikan!', icon: 'success', timer: 1500, showConfirmButton: false, customClass: { popup: 'rounded-2xl' } });
+          switchView('admin');
+        }
+      });
+    }
+
+    function keluarAdmin() {
+      Swal.fire({
+        title: 'Kunci Dashboard?',
+        text: "Anda memerlukan PIN lagi untuk masuk kembali.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        confirmButtonText: 'Ya, Kunci!',
+        cancelButtonText: 'Batal',
+        customClass: { popup: 'rounded-2xl' }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          localStorage.removeItem('sesiAdminDesaCibentang');
+          statusAdminAkses = false;
+          document.getElementById('ikon-kunci').classList.replace('fa-unlock', 'fa-lock');
+          
+          resetAplikasi(); 
+          
+          document.getElementById('tabel-body').innerHTML = '';
+          Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Terkunci', showConfirmButton: false, timer: 3000 });
+        }
+      });
+    }
+
+    function handleFormSubmit(event) {
+      event.preventDefault();
+      
+      if (!linkGambarRTServer) {
+        Swal.fire({ title: 'Akses Ilegal', text: 'Anda belum mengunggah foto pengantar RT.', icon: 'error', customClass: { popup: 'rounded-2xl' } });
+        switchView('pengantar');
+        return;
+      }
+
+      const form = document.getElementById('formSurat');
+      let nilaiJk = '';
+      const radioJk = document.querySelector('input[name="jenisKelamin"]:checked');
+      if (radioJk) nilaiJk = radioJk.value;
+
+      const dusun = document.getElementById('dusun').value || '';
+      const rt = document.getElementById('rt').value || '';
+      const rw = document.getElementById('rw').value || '';
+      let alamatDirakit = '';
+      if(dusun && rt && rw) {
+        alamatDirakit = `Dusun ${dusun}, RT ${rt} / RW ${rw}, Desa Cibentang, Kec. Gunungguruh, Kab. Sukabumi`;
+      }
+
+      const dataForm = {
+        jenisSurat: document.getElementById('jenisSurat').value,
+        nama: document.getElementById('nama').value,
+        nik: document.getElementById('nik').value,
+        tempatLahir: document.getElementById('tempatLahir').value,
+        tanggalLahir: document.getElementById('tanggalLahir').value,
+        jenisKelamin: nilaiJk,
+        pekerjaan: document.getElementById('pekerjaan').value,
+        alamat: alamatDirakit,
+        urlGambarRT: linkGambarRTServer 
+      };
+
+      Swal.fire({
+        title: 'Konfirmasi Akhir',
+        text: `Dokumen surat akan dibuat untuk ${dataForm.nama}. Pastikan semua data benar.`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb',
+        confirmButtonText: '<i class="fa-solid fa-paper-plane mr-2"></i> Kirim Permohonan',
+        cancelButtonText: 'Batal',
+        customClass: { popup: 'rounded-2xl' }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          const btnSubmit = document.getElementById('btn-submit');
+          const originalBtnText = btnSubmit.innerHTML;
+          btnSubmit.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> Mengirim...';
+          btnSubmit.disabled = true;
+
+          google.script.run
+            .withSuccessHandler(function(response) {
+              btnSubmit.innerHTML = originalBtnText;
+              btnSubmit.disabled = false;
+
+              if (response.status === 'success') {
+                document.getElementById('sukses-nama').innerText = dataForm.nama;
+                document.getElementById('sukses-nik').innerText = dataForm.nik;
+                document.getElementById('sukses-jenis').innerText = dataForm.jenisSurat;
+                
+                switchView('sukses'); 
+
+              } else {
+                Swal.fire({ title: 'Gagal!', text: response.message, icon: 'error', customClass: { popup: 'rounded-2xl' } });
+              }
+            })
+            .withFailureHandler(function(error) {
+              btnSubmit.innerHTML = originalBtnText;
+              btnSubmit.disabled = false;
+              Swal.fire({ title: 'Koneksi Terputus!', text: 'Terjadi kesalahan server.', icon: 'error', customClass: { popup: 'rounded-2xl' } });
+            })
+            .prosesPermohonanSurat(dataForm);
+        }
+      });
+    }
+
+    function hapusSuratBerdasarkanIndex(index) {
+      const barisTerpilih = dataAdminTampil[index];
+      const nama = barisTerpilih[1];
+      const urlPdf = barisTerpilih[4];
+      const urlDocx = barisTerpilih[5] || '';
+      const urlGbr = barisTerpilih[6] || '';
+
+      Swal.fire({
+        title: 'Hapus Permanen?',
+        text: `Data beserta Surat & Foto RT atas nama "${nama}" akan dihapus permanen.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        confirmButtonText: 'Ya, Hapus',
+        customClass: { popup: 'rounded-2xl' }
+      }).then((result) => {
+        if (result.isConfirmed) {
+          Swal.fire({ title: 'Menghapus...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }, customClass: { popup: 'rounded-2xl' } });
+
+          google.script.run
+            .withSuccessHandler(function(response) {
+              if (response.status === 'success') {
+                Swal.fire({ title: 'Terhapus!', icon: 'success', timer: 2000, showConfirmButton: false, customClass: { popup: 'rounded-2xl' } });
+                muatDataAdmin(); 
+              } else {
+                Swal.fire({ title: 'Gagal!', text: response.message, icon: 'error', customClass: { popup: 'rounded-2xl' } });
+              }
+            })
+            .withFailureHandler(function(error) { Swal.fire({ title: 'Koneksi Terputus!', icon: 'error', customClass: { popup: 'rounded-2xl' } }); })
+            .hapusDataSurat(urlPdf, urlDocx, urlGbr);
+        }
+      });
+    }
+
+    function muatDataAdmin() {
+      const tbody = document.getElementById('tabel-body');
+      tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center"><i class="fa-solid fa-spinner fa-spin text-3xl mb-3 text-blue-500"></i><p class="text-gray-500">Memuat data...</p></td></tr>`;
+      document.getElementById('input-pencarian').value = '';
+      kolomSortAktif = -1; resetIkonSort();
+
+      google.script.run
+        .withSuccessHandler(function(data) {
+          if (!data || data.length === 0) { dataAdminUtama = []; dataAdminTampil = []; renderTabel(); return; }
+          dataAdminUtama = data; dataAdminTampil = [...dataAdminUtama]; renderTabel();
+        })
+        .withFailureHandler(function(error) {
+           tbody.innerHTML = `<tr><td colspan="5" class="py-12 text-center text-red-500">Gagal memuat data: ${error.message}</td></tr>`;
+        })
+        .dapatkanDataAdmin();
+    }
+
+    function renderTabel() {
+      const tbody = document.getElementById('tabel-body');
+      if (dataAdminTampil.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="py-16 text-center"><div class="bg-gray-50 p-4 rounded-full mb-3 inline-block"><i class="fa-regular fa-folder-open text-4xl text-gray-400"></i></div><p class="text-gray-600 font-semibold">Belum ada data</p></td></tr>`;
+        return;
+      }
+
+      let htmlRows = '';
+      dataAdminTampil.forEach(function(row, index) {
+        const tanggalStr = row[0] || '-';
+        const nama = row[1] || '-';
+        const nik = row[2] || '-';
+        const jenis = row[3] || '-';
+        const urlPdf = row[4] || '#';
+        const urlDocx = row[5] || ''; 
+        const urlGbr = row[6] || ''; 
+
+        let tombolAksi = `<div class="flex items-center justify-center space-x-2">`;
+        
+        if (urlGbr !== '') {
+          tombolAksi += `<a href="${urlGbr}" target="_blank" class="inline-flex items-center justify-center bg-yellow-50 hover:bg-yellow-500 hover:text-white text-yellow-600 p-2.5 rounded-xl transition-all duration-200 shadow-sm border border-yellow-100" title="Lihat Foto RT"><i class="fa-solid fa-image text-lg"></i></a>`;
+        }
+        
+        tombolAksi += `<a href="${urlPdf}" target="_blank" class="inline-flex items-center justify-center bg-red-50 hover:bg-red-500 hover:text-white text-red-600 p-2.5 rounded-xl transition-all duration-200 shadow-sm border border-red-100" title="Unduh PDF"><i class="fa-solid fa-file-pdf text-lg"></i></a>`;
+        
+        if (urlDocx !== '') {
+          tombolAksi += `<a href="${urlDocx}" target="_blank" class="inline-flex items-center justify-center bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 p-2.5 rounded-xl transition-all duration-200 shadow-sm border border-blue-100" title="Unduh Word"><i class="fa-solid fa-file-word text-lg"></i></a>`;
+        }
+        
+        tombolAksi += `<button onclick="hapusSuratBerdasarkanIndex(${index})" class="inline-flex items-center justify-center bg-gray-50 hover:bg-gray-700 hover:text-white text-gray-400 p-2.5 rounded-xl transition-all duration-200 shadow-sm border border-gray-200" title="Hapus Permanen"><i class="fa-solid fa-trash-can text-lg"></i></button></div>`;
+
+        htmlRows += `
+          <tr class="hover:bg-blue-50/50 transition duration-150 border-b border-gray-50">
+            <td class="py-4 px-5 whitespace-nowrap text-gray-500 text-sm"><i class="fa-regular fa-clock mr-2 text-gray-400"></i>${tanggalStr}</td>
+            <td class="py-4 px-5 font-semibold text-gray-700">${nama}</td>
+            <td class="py-4 px-5 text-gray-500">${nik}</td>
+            <td class="py-4 px-5"><span class="inline-block bg-blue-100 text-blue-700 py-1.5 px-3 rounded-xl text-xs font-bold tracking-wide leading-normal text-center shadow-sm">${jenis}</span></td>
+            <td class="py-4 px-5 text-center">${tombolAksi}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = htmlRows;
+    }
+
+    function cariDataAdmin() {
+      const keyword = document.getElementById('input-pencarian').value.toLowerCase();
+      dataAdminTampil = dataAdminUtama.filter(row => {
+        const digabung = (row[0] + " " + row[1] + " " + row[2] + " " + row[3]).toLowerCase();
+        return digabung.includes(keyword);
+      });
+      if(kolomSortAktif !== -1) { jalankanSort(kolomSortAktif, arahSortAsc); } else { renderTabel(); }
+    }
+    function sortTabel(indeksKolom) {
+      if (kolomSortAktif === indeksKolom) { arahSortAsc = !arahSortAsc; } else { kolomSortAktif = indeksKolom; arahSortAsc = true; }
+      resetIkonSort();
+      const iconElement = document.getElementById(`sort-icon-${indeksKolom}`);
+      if (arahSortAsc) { iconElement.className = 'fa-solid fa-sort-up ml-1 text-blue-500 transition'; } 
+      else { iconElement.className = 'fa-solid fa-sort-down ml-1 text-blue-500 transition'; }
+      jalankanSort(indeksKolom, arahSortAsc);
+    }
+    function jalankanSort(indeksKolom, ascending) {
+      dataAdminTampil.sort((a, b) => {
+        let valA = a[indeksKolom] ? a[indeksKolom].toString().toLowerCase() : '';
+        let valB = b[indeksKolom] ? b[indeksKolom].toString().toLowerCase() : '';
+        if (valA < valB) return ascending ? -1 : 1;
+        if (valA > valB) return ascending ? 1 : -1; return 0;
+      });
+      renderTabel();
+    }
+    function resetIkonSort() {
+      for (let i = 0; i <= 3; i++) {
+        const icon = document.getElementById(`sort-icon-${i}`);
+        if(icon) icon.className = 'fa-solid fa-sort ml-1 text-gray-400 transition';
+      }
+    }
+  </script>
+</body>
+</html>
